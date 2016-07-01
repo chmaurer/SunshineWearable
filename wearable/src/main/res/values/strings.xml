@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">Sunshine Wearable</string>
     <string name="my_digital_name">Sunshine Wearable Digital</string>
+    <string name="waiting_for_sync" translatable="true">synching...</string>
+    <string name="morning" translatable="true">first</string>
+    <string name="day" translatable="true">then</string>
 </resources>

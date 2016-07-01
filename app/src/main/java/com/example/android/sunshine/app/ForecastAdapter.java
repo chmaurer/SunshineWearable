@@ -17,72 +17,60 @@ package com.example.android.sunshine.app;
 
 import android.content.Context;
 import android.database.Cursor;
-import android.os.Build;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.view.ViewCompat;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Checkable;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.example.android.sunshine.app.data.WeatherContract;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.wearable.Asset;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.PutDataMapRequest;
+import com.google.android.gms.wearable.PutDataRequest;
+import com.google.android.gms.wearable.Wearable;
+
+import java.io.ByteArrayOutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  * {@link ForecastAdapter} exposes a list of weather forecasts
  * from a {@link android.database.Cursor} to a {@link android.support.v7.widget.RecyclerView}.
  */
-public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.ForecastAdapterViewHolder> {
+public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.ForecastAdapterViewHolder> implements DataApi.DataListener, GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener {
 
     private static final int VIEW_TYPE_TODAY = 0;
     private static final int VIEW_TYPE_FUTURE_DAY = 1;
 
-    // Flag to determine if we want to use a separate view for "today".
-    private boolean mUseTodayLayout = true;
-
-    private Cursor mCursor;
+    private static final String TEMP_LOW_KEY = "sunshine.key.temp.low";
+    private static final String TEMP_HIGH_KEY = "sunshine.key.temp.high";
+    private static final String DATE_KEY = "sunshine.key.date";
+    private static final String UNIT_KEY = "sunshine.key.unit";
+    private static final String WEATHER_IMAGE = "sunshine.key.weather";
     final private Context mContext;
     final private ForecastAdapterOnClickHandler mClickHandler;
     final private View mEmptyView;
     final private ItemChoiceManager mICM;
+    // Flag to determine if we want to use a separate view for "today".
+    private boolean mUseTodayLayout = true;
+    private Cursor mCursor;
+    private GoogleApiClient mGoogleApiClient;
 
-    /**
-     * Cache of the children views for a forecast list item.
-     */
-    public class ForecastAdapterViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
-        public final ImageView mIconView;
-        public final TextView mDateView;
-        public final TextView mDescriptionView;
-        public final TextView mHighTempView;
-        public final TextView mLowTempView;
-
-        public ForecastAdapterViewHolder(View view) {
-            super(view);
-            mIconView = (ImageView) view.findViewById(R.id.list_item_icon);
-            mDateView = (TextView) view.findViewById(R.id.list_item_date_textview);
-            mDescriptionView = (TextView) view.findViewById(R.id.list_item_forecast_textview);
-            mHighTempView = (TextView) view.findViewById(R.id.list_item_high_textview);
-            mLowTempView = (TextView) view.findViewById(R.id.list_item_low_textview);
-            view.setOnClickListener(this);
-        }
-
-        @Override
-        public void onClick(View v) {
-            int adapterPosition = getAdapterPosition();
-            mCursor.moveToPosition(adapterPosition);
-            int dateColumnIndex = mCursor.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_DATE);
-            mClickHandler.onClick(mCursor.getLong(dateColumnIndex), this);
-            mICM.onClick(this);
-        }
-    }
-
-    public static interface ForecastAdapterOnClickHandler {
-        void onClick(Long date, ForecastAdapterViewHolder vh);
-    }
 
     public ForecastAdapter(Context context, ForecastAdapterOnClickHandler dh, View emptyView, int choiceMode) {
         mContext = context;
@@ -90,6 +78,34 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
         mEmptyView = emptyView;
         mICM = new ItemChoiceManager(this);
         mICM.setChoiceMode(choiceMode);
+
+        mGoogleApiClient = new GoogleApiClient.Builder(context).addApi(Wearable.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .build();
+        mGoogleApiClient.connect();
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
+    }
+
+    @Override
+    public void onDataChanged(DataEventBuffer dataEventBuffer) {
+
+    }
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        Wearable.DataApi.addListener(mGoogleApiClient, this);
+
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+        Wearable.DataApi.removeListener(mGoogleApiClient, this);
+        mGoogleApiClient.disconnect();
     }
 
     /*
@@ -102,7 +118,7 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
      */
     @Override
     public ForecastAdapterViewHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) {
-        if ( viewGroup instanceof RecyclerView ) {
+        if (viewGroup instanceof RecyclerView) {
             int layoutId = -1;
             switch (viewType) {
                 case VIEW_TYPE_TODAY: {
@@ -139,7 +155,7 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
                 useLongToday = false;
         }
 
-        if ( Utility.usingLocalGraphics(mContext) ) {
+        if (Utility.usingLocalGraphics(mContext)) {
             forecastAdapterViewHolder.mIconView.setImageResource(defaultImage);
         } else {
             Glide.with(mContext)
@@ -182,7 +198,44 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
         forecastAdapterViewHolder.mLowTempView.setText(lowString);
         forecastAdapterViewHolder.mLowTempView.setContentDescription(mContext.getString(R.string.a11y_low_temp, lowString));
 
+
+        Date d = new Date(dateInMillis);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
+        if (sdf.format(new Date()).equals(sdf.format(d))) {
+            //if today
+            updateWearables(sdf.format(d), Math.round(low) + "", Math.round(high) + "", weatherId);
+        }
+
         mICM.onBindViewHolder(forecastAdapterViewHolder, position);
+    }
+
+    private Asset createAssetFromResource(int res) {
+        final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        Bitmap b = BitmapFactory.decodeResource(mContext.getResources(), Utility.getArtResourceForWeatherCondition(res));
+        b.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream);
+        return Asset.createFromBytes(byteArrayOutputStream.toByteArray());
+    }
+
+    private void updateWearables(String dateTime, String low, String high, int weatherId) {
+        PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/temp");
+        putDataMapReq.getDataMap().putString("DIFF", new Date().toString());
+        putDataMapReq.getDataMap().putString(TEMP_HIGH_KEY, high);
+        putDataMapReq.getDataMap().putString(TEMP_LOW_KEY, low);
+        putDataMapReq.getDataMap().putString(DATE_KEY, dateTime);
+        putDataMapReq.getDataMap().putString(UNIT_KEY, Utility.isMetric(mContext) ? mContext.getResources().getText(R.string.degree_celsius).toString() : mContext.getResources().getText(R.string.degree_fahrenheit).toString());
+        putDataMapReq.getDataMap().putAsset(WEATHER_IMAGE, createAssetFromResource(weatherId));
+        PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
+        Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq).setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+            @Override
+            public void onResult(DataApi.DataItemResult dataItemResult) {
+                if (!dataItemResult.getStatus().isSuccess()) {
+                    Toast.makeText(mContext, mContext.getResources().getText(R.string.sync_no_success), Toast.LENGTH_SHORT);
+                } else {
+                    Toast.makeText(mContext, mContext.getResources().getText(R.string.sync_success), Toast.LENGTH_SHORT);
+                }
+            }
+        });
+
     }
 
     public void onRestoreInstanceState(Bundle savedInstanceState) {
@@ -208,7 +261,7 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
 
     @Override
     public int getItemCount() {
-        if ( null == mCursor ) return 0;
+        if (null == mCursor) return 0;
         return mCursor.getCount();
     }
 
@@ -223,9 +276,43 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
     }
 
     public void selectView(RecyclerView.ViewHolder viewHolder) {
-        if ( viewHolder instanceof ForecastAdapterViewHolder ) {
-            ForecastAdapterViewHolder vfh = (ForecastAdapterViewHolder)viewHolder;
+        if (viewHolder instanceof ForecastAdapterViewHolder) {
+            ForecastAdapterViewHolder vfh = (ForecastAdapterViewHolder) viewHolder;
             vfh.onClick(vfh.itemView);
+        }
+    }
+
+    public interface ForecastAdapterOnClickHandler {
+        void onClick(Long date, ForecastAdapterViewHolder vh);
+    }
+
+    /**
+     * Cache of the children views for a forecast list item.
+     */
+    public class ForecastAdapterViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
+        public final ImageView mIconView;
+        public final TextView mDateView;
+        public final TextView mDescriptionView;
+        public final TextView mHighTempView;
+        public final TextView mLowTempView;
+
+        public ForecastAdapterViewHolder(View view) {
+            super(view);
+            mIconView = (ImageView) view.findViewById(R.id.list_item_icon);
+            mDateView = (TextView) view.findViewById(R.id.list_item_date_textview);
+            mDescriptionView = (TextView) view.findViewById(R.id.list_item_forecast_textview);
+            mHighTempView = (TextView) view.findViewById(R.id.list_item_high_textview);
+            mLowTempView = (TextView) view.findViewById(R.id.list_item_low_textview);
+            view.setOnClickListener(this);
+        }
+
+        @Override
+        public void onClick(View v) {
+            int adapterPosition = getAdapterPosition();
+            mCursor.moveToPosition(adapterPosition);
+            int dateColumnIndex = mCursor.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_DATE);
+            mClickHandler.onClick(mCursor.getLong(dateColumnIndex), this);
+            mICM.onClick(this);
         }
     }
 }

@@ -29,8 +29,6 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
 import android.text.format.Time;
@@ -38,15 +36,6 @@ import android.view.SurfaceHolder;
 import android.view.WindowInsets;
 
 import com.chmaurer.wearable.service.WeatherService;
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.wearable.DataApi;
-import com.google.android.gms.wearable.DataEvent;
-import com.google.android.gms.wearable.DataEventBuffer;
-import com.google.android.gms.wearable.DataItem;
-import com.google.android.gms.wearable.DataMap;
-import com.google.android.gms.wearable.DataMapItem;
-import com.google.android.gms.wearable.Wearable;
 
 import java.lang.ref.WeakReference;
 import java.util.TimeZone;
@@ -56,7 +45,7 @@ import java.util.concurrent.TimeUnit;
  * Digital watch face with seconds. In ambient mode, the seconds aren't displayed. On devices with
  * low-bit ambient mode, the text is drawn without anti-aliasing in ambient mode.
  */
-public class SunshineWatchFace extends CanvasWatchFaceService{
+public class SunshineWatchFace extends CanvasWatchFaceService {
     private static final Typeface NORMAL_TYPEFACE =
             Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL);
     private static final Typeface BOLD_TYPEFACE =
@@ -78,8 +67,6 @@ public class SunshineWatchFace extends CanvasWatchFaceService{
     public Engine onCreateEngine() {
         return new Engine();
     }
-
-
 
 
     private static class EngineHandler extends Handler {
@@ -107,6 +94,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService{
         boolean mRegisteredTimeZoneReceiver = false;
         Paint mBackgroundPaint;
         Paint mTextPaint;
+        Paint mSmallTextPaint;
         boolean mAmbient;
         Time mTime;
         final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
@@ -145,7 +133,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService{
 
             mTextPaint = new Paint();
             mTextPaint = createTextPaint(resources.getColor(R.color.digital_text));
-
+            mSmallTextPaint = mTextPaint;
             mTime = new Time();
 
 
@@ -214,7 +202,11 @@ public class SunshineWatchFace extends CanvasWatchFaceService{
             float textSize = resources.getDimension(isRound
                     ? R.dimen.digital_text_size_round : R.dimen.digital_text_size);
 
+            float textSizeSmall = resources.getDimension(isRound
+                    ? R.dimen.digital_text_size_round_small : R.dimen.digital_text_size_small);
+
             mTextPaint.setTextSize(textSize);
+            mSmallTextPaint.setTextSize(textSizeSmall);
         }
 
         @Override
@@ -231,7 +223,6 @@ public class SunshineWatchFace extends CanvasWatchFaceService{
         @Override
         public void onTimeTick() {
             super.onTimeTick();
-            //TODO check weather
             invalidate();
 
         }
@@ -284,13 +275,24 @@ public class SunshineWatchFace extends CanvasWatchFaceService{
             } else {
                 canvas.drawRect(0, 0, bounds.width(), bounds.height(), mBackgroundPaint);
             }
-            //TODO Do drawing fast here
             // Draw H:MM in ambient mode or H:MM:SS in interactive mode.
-            mTime.setToNow();
-            String text = mAmbient
-                    ? String.format("%d:%02d", mTime.hour, mTime.minute)
-                    : String.format("%d:%02d:%02d", mTime.hour, mTime.minute, mTime.second);
-            canvas.drawText("11 " + WeatherService.getLastTempData(), mXOffset, mYOffset, mTextPaint);
+            if (WeatherService.getWeatherHolder() == null) {
+
+                canvas.drawText(getResources().getText(R.string.waiting_for_sync).toString(), mXOffset - 0, mYOffset, mTextPaint);
+            } else {
+                mTime.setToNow();
+                String text = mAmbient
+                        ? String.format("%d:%02d", mTime.hour, mTime.minute)
+                        : String.format("%d:%02d:%02d", mTime.hour, mTime.minute, mTime.second);
+                canvas.drawText(text, mXOffset, mYOffset - 50, mTextPaint);
+                canvas.drawText(getApplicationContext().getResources().getString(R.string.morning).toString() + " "
+                        + WeatherService.getWeatherHolder().getTempMorning() + WeatherService.getWeatherHolder().getTempUnit(), mXOffset, mYOffset + 30, mSmallTextPaint);
+                canvas.drawText(getApplicationContext().getResources().getString(R.string.day).toString() + " "
+                        + WeatherService.getWeatherHolder().getTempDay() + WeatherService.getWeatherHolder().getTempUnit(), mXOffset, mYOffset + 80, mTextPaint);
+
+                // Bitmap b = BitmapFactory.decodeStream(new ByteArrayInputStream(WeatherService.getWeatherHolder().getImage().getData()));
+                //    canvas.drawBitmap(b, 0, 0, mTextPaint);
+            }
         }
 
         /**

@@ -30,6 +30,10 @@
     <string name="action_settings">Settings</string>
     <string name="action_map">Map Location</string>
     <string name="action_share">Share</string>
+    <string name="sync_success" translatable="true">Sync to watch successful</string>
+    <string name="sync_no_success" translatable="true">Sync to watch unsuccessful</string>
+    <string name="degree_celsius" translatable="false">°C</string>
+    <string name="degree_fahrenheit" translatable="false">°F</string>
 
     <!-- Menu label to fetch updated weather info from the server -->
     <string name="action_refresh" translatable="false">Refresh</string>
