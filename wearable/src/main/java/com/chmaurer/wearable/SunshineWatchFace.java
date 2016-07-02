@@ -21,6 +21,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -115,6 +116,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
          */
         boolean mLowBitAmbient;
 
+
         @Override
         public void onCreate(SurfaceHolder holder) {
             super.onCreate(holder);
@@ -137,7 +139,6 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             mTime = new Time();
 
 
-            //TODO build watch face here
         }
 
         @Override
@@ -290,10 +291,11 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 canvas.drawText(getApplicationContext().getResources().getString(R.string.day).toString() + " "
                         + WeatherService.getWeatherHolder().getTempDay() + WeatherService.getWeatherHolder().getTempUnit(), mXOffset, mYOffset + 80, mTextPaint);
 
-                // Bitmap b = BitmapFactory.decodeStream(new ByteArrayInputStream(WeatherService.getWeatherHolder().getImage().getData()));
-                //    canvas.drawBitmap(b, 0, 0, mTextPaint);
+                Bitmap b = WeatherService.getWeatherHolder().getBitmap();
+                canvas.drawBitmap(b, 0, 0, mTextPaint);
             }
         }
+
 
         /**
          * Starts the {@link #mUpdateTimeHandler} timer if it should be running and isn't currently
