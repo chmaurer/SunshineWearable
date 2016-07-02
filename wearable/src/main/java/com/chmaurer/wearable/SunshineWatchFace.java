@@ -109,6 +109,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
         float mXOffset;
         float mYOffset;
+        int mImageSize;
 
         /**
          * Whether the display supports fewer bits for each color in ambient mode. When true, we
@@ -135,7 +136,8 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
             mTextPaint = new Paint();
             mTextPaint = createTextPaint(resources.getColor(R.color.digital_text));
-            mSmallTextPaint = mTextPaint;
+            mSmallTextPaint = new Paint();
+            mSmallTextPaint = createTextPaint(resources.getColor(R.color.digital_text));
             mTime = new Time();
 
 
@@ -205,6 +207,8 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
             float textSizeSmall = resources.getDimension(isRound
                     ? R.dimen.digital_text_size_round_small : R.dimen.digital_text_size_small);
+
+            mImageSize = resources.getDimensionPixelSize(isRound ? R.dimen.digital_bitmap_size : R.dimen.digital_bitmap_size_quare);
 
             mTextPaint.setTextSize(textSize);
             mSmallTextPaint.setTextSize(textSizeSmall);
@@ -279,20 +283,24 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             // Draw H:MM in ambient mode or H:MM:SS in interactive mode.
             if (WeatherService.getWeatherHolder() == null) {
 
-                canvas.drawText(getResources().getText(R.string.waiting_for_sync).toString(), mXOffset - 0, mYOffset, mTextPaint);
+                canvas.drawText(getResources().getText(R.string.waiting_for_sync).toString(), mXOffset, mYOffset, mTextPaint);
             } else {
                 mTime.setToNow();
                 String text = mAmbient
                         ? String.format("%d:%02d", mTime.hour, mTime.minute)
                         : String.format("%d:%02d:%02d", mTime.hour, mTime.minute, mTime.second);
-                canvas.drawText(text, mXOffset, mYOffset - 50, mTextPaint);
+                canvas.drawText(text, mXOffset, mYOffset - mTextPaint.getTextSize(), mTextPaint);
                 canvas.drawText(getApplicationContext().getResources().getString(R.string.morning).toString() + " "
-                        + WeatherService.getWeatherHolder().getTempMorning() + WeatherService.getWeatherHolder().getTempUnit(), mXOffset, mYOffset + 30, mSmallTextPaint);
+                        + WeatherService.getWeatherHolder().getTempMorning() + WeatherService.getWeatherHolder().getTempUnit(), mXOffset + mImageSize, mYOffset + mImageSize, mSmallTextPaint);
                 canvas.drawText(getApplicationContext().getResources().getString(R.string.day).toString() + " "
-                        + WeatherService.getWeatherHolder().getTempDay() + WeatherService.getWeatherHolder().getTempUnit(), mXOffset, mYOffset + 80, mTextPaint);
+                        + WeatherService.getWeatherHolder().getTempDay() + WeatherService.getWeatherHolder().getTempUnit(), mXOffset, mYOffset + mTextPaint.getTextSize() * 2, mTextPaint);
 
                 Bitmap b = WeatherService.getWeatherHolder().getBitmap();
-                canvas.drawBitmap(b, 0, 0, mTextPaint);
+                if (b == null) {
+                    //dont draw image, can happen when wrong google play services installed
+                } else {
+                    canvas.drawBitmap(Bitmap.createScaledBitmap(b, mImageSize, mImageSize, false), mXOffset, mYOffset, mTextPaint);
+                }
             }
         }
 
